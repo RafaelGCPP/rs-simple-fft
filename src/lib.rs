@@ -1,14 +1,12 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+#![no_std]
 
+// Enables the standard library only for tests,
+// so you can run 'cargo test' on your PC normally.
 #[cfg(test)]
-mod tests {
-    use super::*;
+extern crate std;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub mod common;
+pub mod float;
+pub mod fixed;
+
+// The rest of the code will come later...
