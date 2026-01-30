@@ -1,3 +1,4 @@
+use crate::common::FftError; 
 use num_complex::Complex32; // Complex<f32>
 use core::f32::consts::PI;
 
@@ -8,14 +9,6 @@ use core::f32::consts::PI;
 use std::f32;
 #[cfg(not(feature = "std"))]
 use libm::Libm;
-
-/// Erros possíveis na execução da FFT
-#[derive(Debug, PartialEq)]
-pub enum FftError {
-    SizeMismatch,
-    NotPowerOfTwo,
-    BufferTooSmall,
-}
 
 /// Estrutura que segura as tabelas pré-computadas (Twiddle factors e Bit Reverse).
 /// Isso substitui passar 'twiddle' e 'bitrev' soltos em toda função.
