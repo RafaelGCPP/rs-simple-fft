@@ -1,7 +1,8 @@
-// use crate::common::FftError;
-// use num_complex::Complex32;
-// use core::slice;
-// use super::core::{radix_2_dit_fft_core, precompute_twiddles, precompute_bitrev};
+use crate::common::FftError;
+use num_complex::Complex32;
+use core::slice;
+use super::core::{radix_2_dit_fft_core, precompute_twiddles, precompute_bitrev};
+
 
 // #[cfg(feature = "std")]
 // use std::f32;
@@ -14,128 +15,113 @@
 //     n: usize,
 // }
 
-// impl<'a> RealFft<'a> {
-//     /// Inicializa a FFT Real.
-//     /// Note que 'n' aqui é o número de amostras REAIS.
-//     pub fn new(
-//         twiddles: &'a mut [Complex32], 
-//         bitrev: &'a mut [usize], 
-//         n: usize
-//     ) -> Result<Self, FftError> {
-//         if !n.is_power_of_two() {
-//             return Err(FftError::NotPowerOfTwo);
-//         }
-//         // Para uma RFFT de N pontos, precisamos de tabelas auxiliares
-//         // compatíveis com a FFT Complexa subjacente de N/2 pontos,
-//         // MAS o pós-processamento precisa de twiddles mais finos (tamanho N).
-//         // O código C original gera twiddles para N/2 * 2 = N na verdade (ver fft_init.c).
-//         if twiddles.len() < n / 2 || bitrev.len() < n / 2 {
-//             return Err(FftError::BufferTooSmall);
-//         }
+impl<'a> RealFft<'a> {
+    /// Initializes the Real FFT.
+    /// Note that 'n' here is the number of REAL samples.
+    pub fn new(
+        twiddles: &'a mut [Complex32], 
+        bitrev: &'a mut [usize], 
+        n: usize
+    ) -> Result<Self, FftError> {
+        if !n.is_power_of_two() {
+            return Err(FftError::NotPowerOfTwo);
+        }
+        // For an N-point RFFT, we need auxiliary tables
+        // compatible with the underlying N/2-point Complex FFT,
+        // BUT the post-processing needs finer twiddles (size N).
+        // The original C code actually generates twiddles for N/2 * 2 = N (see fft_init.c).
+        if twiddles.len() < n / 2 || bitrev.len() < n / 2 {
+            return Err(FftError::BufferTooSmall);
+        }
 
 //         let mut fft = Self { twiddles, bitrev, n };
 //         fft.precompute();
 //         Ok(fft)
 //     }
 
-//     fn precompute(&mut self) {        
-//         // 1. Bitrev é gerado para N/2 (tamanho da FFT interna)
-//         precompute_bitrev(self.bitrev, self.n / 2);
+    fn precompute(&mut self) {        
+        // 1. Bitrev is generated for N/2 (size of the internal FFT)
+        precompute_bitrev(self.bitrev, self.n / 2);
         
-//         // 2. Twiddles são gerados para N (círculo completo)
-//         // Isso é o que permite o pós-processamento funcionar
-//         precompute_twiddles(self.twiddles, self.n);
-//     }
+        // 2. Twiddles are generated for N (full circle)
+        // This is what allows the post-processing to work
+        precompute_twiddles(self.twiddles, self.n);
+    }
 
-//     /// Executa a FFT Real Forward.
-//     /// O resultado é compactado:
-//     /// - buffer[0].re = DC (Frequência 0)
-//     /// - buffer[0].im = Nyquist (Frequência N/2)
-//     /// - buffer[1..N/2] = Frequências positivas normais.
-//     pub fn process(&self, buffer: &mut [f32]) -> Result<(), FftError> {
-//         if buffer.len() != self.n {
-//             return Err(FftError::SizeMismatch);
-//         }
+    /// Executes the Real FFT Forward.
+    /// The result is packed:
+    /// - buffer[0].re = DC (Frequency 0)
+    /// - buffer[0].im = Nyquist (Frequency N/2)
+    /// - buffer[1..N/2] = Normal positive frequencies.
+    pub fn process(&self, buffer: &mut [f32]) -> Result<(), FftError> {
+        if buffer.len() != self.n {
+            return Err(FftError::SizeMismatch);
+        }
 
-//         // TRUQUE DO C: Reinterpretar array de float como array de Complex
-//         // Safety: Complex32 é repr(C) de dois f32s, e o alinhamento é compatível.
-//         let cbuffer = unsafe {
-//             slice::from_raw_parts_mut(
-//                 buffer.as_mut_ptr() as *mut Complex32,
-//                 self.n / 2
-//             )
-//         };
+        // C TRICK: Reinterpret float array as Complex array
+        // Safety: Complex32 is repr(C) of two f32s, and alignment is compatible.
+        let cbuffer = unsafe {
+            slice::from_raw_parts_mut(
+                buffer.as_mut_ptr() as *mut Complex32,
+                self.n / 2
+            )
+        };
 
-//         // 1. Executa FFT Complexa de N/2 pontos
-//         // Como a FFT interna precisa de "stride 2" nos twiddles (usando apenas índices pares
-//         // da tabela completa que geramos), implementamos a lógica butterfly aqui internamente
-//         // para não complicar a struct CplxFft.
-//         radix_2_dit_fft_core::<false>(cbuffer, self.twiddles, self.bitrev, 2);
+        // FFT of the complex sequence of N/2 points, interleaved from real input
+        // This basically creates a complex FFT of the even and odd indexed samples
+        // where the odd indexed samples are multiplied by j (the imaginary unit).
+        
 
-//         // 2. Pós-processamento (Unweaving) - Port do rfft.c
-//         let n_half = self.n / 2;
-//         let n_quarter = n_half / 2;
+        radix_2_dit_fft_core(cbuffer, self.twiddles, self.bitrev, 2, false);
 
-//         // Processa índice 0 (DC e Nyquist)
-//         {
-//             let val = cbuffer[0];
-//             let tmp = val.conj();
+        // Unweaving
+        let n_half = self.n / 2;
+        let n_quarter = n_half / 2;
+
+        // Processa índice 0 (DC e Nyquist)
+        {
+            let val = cbuffer[0];
+
+            // Because of how the complex FFT output is structured for real input,
+            // c[0] will have the DC and Nyquist components intertwined.
             
-//             let even = (val + tmp).scale(0.5);
-//             let odd = (val - tmp).scale(0.5);
-            
-//             // cdata[0] = even - I * odd; 
-//             // -I * odd = -I * (odd.re + I*odd.im) = -I*odd.re + odd.im
-//             let minus_i_odd = Complex32::new(odd.im, -odd.re); // Multiplicação por -i
-            
-//             // Truque de armazenamento: Real=DC, Imag=Nyquist
-//             // No código C original:
-//             // cdata[0] += I * even - odd; (estranho, vamos seguir a lógica algébrica do C)
-//             // Código C:
-//             // tmp.real = -odd.imag; tmp.imag = odd.real; (tmp = i * odd) ?? Não, -odd.im é mult por -i se odd for real puro...
-//             // Vamos seguir estritamente as linhas do C rfft.c:
-            
-//             // C: even = (cdata[0] + conj(cdata[0])) / 2;
-//             // C: odd = (cdata[0] - conj(cdata[0])) / 2;
-//             // C: tmp = I * odd -> (re: -odd.im, im: odd.re)
-//             // C: cdata[0] = even - I * odd; -> Isto recupera o valor correto
-//             // C: tmp = I * even
-//             // C: cdata[0] += I * even - odd; 
-            
-//             // Simplificando o que o C faz no final para index 0:
-//             // O código C coloca: 
-//             // Real part = even.real + odd.imag (Basicamente a soma das partes reais originais)
-//             // Imag part = even.real - odd.imag
-//             // Vamos usar a lógica direta de reconstrução:
-//             cbuffer[0] = Complex32::new(val.re + val.im, val.re - val.im);
-//             // Nota: Se houver escala de 0.5 faltando, ajustaremos. 
-//             // O código C faz muitas somas e subtrações, mas o resultado final para index 0 é esse.
-//             // Para garantir bit-exactness com o C, você pode copiar linha a linha, 
-//             // mas Complex32::new(cbuffer[0].re + cbuffer[0].im, ...) é a otimização clássica.
-//         }
+            // The real part of c[0] is composed by the DC component of the 
+            // even indexed sequence and the nyquist component of the odd indexed
+            // sequence.
 
-//         // Loop principal de unweaving
-//         for i in 1..=n_quarter { // Inclui n_quarter para tratar o ponto médio se necessário
-//             // O código C trata n/4 separadamente, mas vamos ver o loop
-//             if i == n_quarter {
-//                  // Caso especial i = N/4
-//                  let val = cbuffer[i];
-//                  let tmp = val.conj();
-//                  let even = (val + tmp).scale(0.5);
-//                  let odd = (val - tmp).scale(0.5);
-//                  // cdata[n/4] = even - odd; (direction 1)
-//                  cbuffer[i] = even - odd; // Em complexo, -odd é -1*odd.
-//                  // A parte imaginária do resultado deve ser 0 teoricamente se for n/4 exato?
-//                  // No código C: cplx_sub(cdata[n/4], even, odd);
-//                  continue;
-//             }
+            // The imaginary part of c[0] is composed by the DC component of the 
+            // odd indexed sequence and the nyquist component of the even indexed
+            // sequence.
+
+            // hence we can reconstruct them as follows:
+            // DC component = even.real + odd.imag = c[0].re + c[0].im
+            // Nyquist component = even.real - odd.imag = c[0].re - c[0].im
+
+            cbuffer[0] = Complex32::new(val.re + val.im, val.re - val.im);
+
+        }
+
+        // Main unweaving loop
+        for i in 1..=n_quarter { 
+            if i == n_quarter {
+                 // Special case i = N/4 
+                 // in this case twiddle is 90 degrees (I) and the corresponding FFT components
+                 // of the even and odd indexed sequences have the same index.
+
+                 // The odd indexed sequence, multiplied by j, becomes a rotation by 90 degrees.
+                 // Thus we can simplify the calculations, by just conjugating the value.
+
+                 cbuffer[i] = cbuffer[i].conj();
+
+                 continue;
+            }
 
 //             let idx_a = i;
 //             let idx_b = n_half - i;
 
-//             let val_a = cbuffer[idx_a];
-//             let val_b = cbuffer[idx_b];
-//             let val_b_conj = val_b.conj(); // tmp = conj(cdata[n/2 - i])
+            let val_a = cbuffer[idx_a];
+            let val_b = cbuffer[idx_b];
+            let val_b_conj = val_b.conj(); 
 
 //             // even = (cdata[i] + conj(cdata[n/2-i])) / 2
 //             let even = (val_a + val_b_conj).scale(0.5);
