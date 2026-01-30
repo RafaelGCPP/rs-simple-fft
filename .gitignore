@@ -1,0 +1,42 @@
+# Rust/Cargo - gitignore generated for Rust projects
+# Ignore build artifacts
+/target/
+
+# Ignore backup and temporary files
+**/*.rs.bk
+*~
+*.swp
+*.swo
+*.bak
+
+# Ignore compiled Rust artifacts
+*.rlib
+*.rmeta
+
+# Ignore dynamic libraries and executables
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Ignore IDE/editor folders
+.vscode/
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+*.lcov
+
+# Optional: ignore build scripts output
+/target/debug/
+/target/release/
+
+# Keep Cargo.lock under version control for binaries; do not ignore it

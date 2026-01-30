@@ -1,0 +1,31 @@
+# Normalize line endings to avoid CRLF/LF problems when cloning on Windows or Linux
+# Auto-detect text files and normalize them in the repository
+* text=auto
+
+# Force LF for typical source and text files
+*.rs text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.toml text eol=lf
+*.sh text eol=lf
+
+# Use CRLF for Windows batch files
+*.bat text eol=crlf
+
+# Treat common binaries as binary so Git won't attempt to normalize them
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.zip binary
+*.tar.gz binary
+
+# Ensure end-of-line normalization for other config files
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
