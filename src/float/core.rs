@@ -8,11 +8,11 @@ use std::f32;
 #[cfg(not(feature = "std"))]
 use libm::Libm;
 
-// --- Funções Auxiliares Públicas para o Módulo (pub(crate)) ---
+// --- Public Auxiliary Functions for the Module (pub(crate)) ---
 
-/// Calcula os fatores de rotação (Twiddle Factors) para uma FFT de tamanho N.
+/// Computes the rotation factors (Twiddle Factors) for an FFT of size N.
 pub(crate) fn precompute_twiddles(twiddles: &mut [Complex32], n: usize) {
-    // Note que geramos apenas N/2 fatores, pois é o necessário para Radix-2
+    // Only N/2 factors are generated, which is sufficient for Radix-2
     for j in 0..(n / 2) {
         let angle = -2.0 * PI * (j as f32) / (n as f32);
         let (sin, cos) = sin_cos(angle);
@@ -20,7 +20,7 @@ pub(crate) fn precompute_twiddles(twiddles: &mut [Complex32], n: usize) {
     }
 }
 
-/// Preenche a tabela de bit-reversal.
+/// Fills the bit-reversal table.
 pub(crate) fn precompute_bitrev(bitrev: &mut [usize], n: usize) {
     bitrev[0] = 0;
     let mut j = 0;
@@ -35,7 +35,7 @@ pub(crate) fn precompute_bitrev(bitrev: &mut [usize], n: usize) {
     }
 }
 
-/// Função auxiliar agnóstica para sin/cos
+/// Agnostic helper function for sin/cos
 fn sin_cos(angle: f32) -> (f32, f32) {
     #[cfg(feature = "std")]
     return (angle.sin(), angle.cos());
@@ -44,8 +44,8 @@ fn sin_cos(angle: f32) -> (f32, f32) {
     return (libm::sinf(angle), libm::cosf(angle));
 }
 
-/// Essa função é o equivalente direto de `radix_2_dit_fft` do seu código C.
-/// Ela não é pub(crate) para o usuário final, apenas para uso interno dos módulos real e complex.
+/// This function is the direct equivalent of `radix_2_dit_fft` from your C code.
+/// It is not pub(crate) for the end user, only for internal use by the real and complex modules.
 pub(crate) fn radix_2_dit_fft_core<const INVERSE: bool>(
     buffer: &mut [Complex32], 
     twiddles: &[Complex32], 
@@ -73,7 +73,7 @@ pub(crate) fn radix_2_dit_fft_core<const INVERSE: bool>(
             for i in 0..stride {
                 let mut w = twiddles[i * tw_index * twiddle_stride];
                 
-                // O compilador removerá este IF completamente porque INVERSE é constante em tempo de compilação
+                // The compiler will completely remove this IF because INVERSE is a compile-time constant
                 if INVERSE {
                     w = w.conj();
                 }
@@ -86,8 +86,8 @@ pub(crate) fn radix_2_dit_fft_core<const INVERSE: bool>(
                 let mut v1 = a + t;
                 let mut v2 = a - t;
 
-                // Normalização por estágio para evitar saturação (comportamento de ponto fixo)
-                // O compilador otimizará isso para INVERSE = true/false
+                // Stage normalization to avoid saturation (fixed-point behavior)
+                // The compiler will optimize this for INVERSE = true/false
                 if INVERSE {
                     v1 = v1.scale(0.5);
                     v2 = v2.scale(0.5);
