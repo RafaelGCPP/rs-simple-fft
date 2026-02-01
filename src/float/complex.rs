@@ -5,8 +5,8 @@ use super::core::{radix_2_dit_fft_core, precompute_twiddles, precompute_bitrev};
 // In no_std, we need to import math functions from somewhere.
 // If the "std" feature is enabled, we use native f32::sin/cos.
 // Otherwise, we use libm via the Float trait from num_traits.
-#[cfg(feature = "std")]
-use std::f32;
+// #[cfg(feature = "std")]
+// use std::f32;
 #[cfg(not(feature = "std"))]
 use libm::Libm;
 
@@ -49,20 +49,20 @@ impl<'a> CplxFft<'a> {
             return Err(FftError::SizeMismatch);
         }
 
-        radix_2_dit_fft_core(buffer, self.twiddles, self.bitrev, 1, inverse);
-
-
-        // 3. Normalization for Inverse FFT (If needed)
-        // The original C code divides by 2 at each stage (cplx_half).
-        // Here, for simplicity and better precision, it's common to divide everything at the end.
-        // But if you want to strictly follow the C code:
+        // Despacha para a versão monomorfizada correta
         if inverse {
-            let factor = 1.0 / (self.n as f32);
-            for x in buffer.iter_mut() {
-                *x = x.scale(factor);
-            }
+            radix_2_dit_fft_core::<true>(buffer, self.twiddles, self.bitrev, 1);
+        } else {
+            radix_2_dit_fft_core::<false>(buffer, self.twiddles, self.bitrev, 1);
         }
+
+        // A normalização agora é feita passo a passo dentro do core (fixed-point style),
+        // portanto não precisamos mais escalar no final.
 
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "complex_tests.rs"] // Aponta para o arquivo separado
+mod tests;

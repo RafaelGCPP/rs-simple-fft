@@ -46,12 +46,11 @@ fn sin_cos(angle: f32) -> (f32, f32) {
 
 /// Essa função é o equivalente direto de `radix_2_dit_fft` do seu código C.
 /// Ela não é pub(crate) para o usuário final, apenas para uso interno dos módulos real e complex.
-pub(crate) fn radix_2_dit_fft_core(
+pub(crate) fn radix_2_dit_fft_core<const INVERSE: bool>(
     buffer: &mut [Complex32], 
     twiddles: &[Complex32], 
     bitrev: &[usize],
-    twiddle_stride: usize, 
-    inverse: bool
+    twiddle_stride: usize
 ) {
     let n = buffer.len();
 
@@ -74,7 +73,8 @@ pub(crate) fn radix_2_dit_fft_core(
             for i in 0..stride {
                 let mut w = twiddles[i * tw_index * twiddle_stride];
                 
-                if inverse {
+                // O compilador removerá este IF completamente porque INVERSE é constante em tempo de compilação
+                if INVERSE {
                     w = w.conj();
                 }
 
@@ -83,11 +83,25 @@ pub(crate) fn radix_2_dit_fft_core(
                 let b = buffer[index + stride];
                 let t = b * w;
 
-                buffer[index] = a + t;
-                buffer[index + stride] = a - t;
+                let mut v1 = a + t;
+                let mut v2 = a - t;
+
+                // Normalização por estágio para evitar saturação (comportamento de ponto fixo)
+                // O compilador otimizará isso para INVERSE = true/false
+                if INVERSE {
+                    v1 = v1.scale(0.5);
+                    v2 = v2.scale(0.5);
+                }
+
+                buffer[index] = v1;
+                buffer[index + stride] = v2;
             }
         }
         stride <<= 1;
         tw_index >>= 1;
     }
 }
+
+#[cfg(test)]
+#[path = "core_tests.rs"]
+mod tests;
