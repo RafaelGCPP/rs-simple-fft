@@ -1,5 +1,5 @@
 use super::core::{precompute_bitrev, precompute_twiddles, radix_2_dit_fft_core};
-use crate::common::FftError;
+use crate::common::{ FftError , FftProcess };
 use core::slice;
 use num_complex::Complex32;
 
@@ -205,6 +205,12 @@ impl<'a> RealFft<'a> {
     }
 }
 
+// Implementação da trait FftProcess para RealFft
+impl<'a> FftProcess<f32> for RealFft<'a> {
+    fn process(&self, buffer: &mut [f32], inverse: bool) -> Result<(), FftError> {
+        self.process(buffer, inverse)
+    }
+}
 
 #[cfg(test)]
 #[path = "real_tests.rs"]

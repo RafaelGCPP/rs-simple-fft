@@ -21,5 +21,9 @@ impl fmt::Display for FftError {
     }
 }
 
+pub trait FftProcess<T> {
+    fn process(&self, buffer: &mut [T], inverse: bool) -> Result<(), FftError>;
+}
+
 #[cfg(feature = "std")]
 impl std::error::Error for FftError {}

@@ -1,4 +1,4 @@
-use crate::common::FftError; 
+use crate::common::{FftError, FftProcess}; // Adicione FftProcess aqui
 use num_complex::Complex32; // Complex<f32>
 use super::core::{radix_2_dit_fft_core, precompute_twiddles, precompute_bitrev};
 
@@ -56,6 +56,13 @@ impl<'a> CplxFft<'a> {
         }
 
         Ok(())
+    }
+}
+
+// Implementação da trait FftProcess para CplxFft
+impl<'a> FftProcess<Complex32> for CplxFft<'a> {
+    fn process(&self, buffer: &mut [Complex32], inverse: bool) -> Result<(), FftError> {
+        self.process(buffer, inverse)
     }
 }
 
