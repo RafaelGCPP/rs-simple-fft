@@ -99,9 +99,8 @@ impl<'a> RealFft<'a> {
         }
 
         cbuffer[n_quarter] = cbuffer[n_quarter].conj();
-
         // Main unweaving loop
-        for i in 1..=n_quarter - 1 {
+        for i in 1..n_quarter {
             let idx_a = i;
             let idx_b = n_half - i;
 
@@ -158,7 +157,7 @@ impl<'a> RealFft<'a> {
         );
         cbuffer[n_quarter] = cbuffer[n_quarter].conj();
 
-        for i in 1..n_quarter - 1 {
+        for i in 1..n_quarter  {
             let idx_a = i;
             let idx_b = n_half - i;
 
@@ -179,8 +178,11 @@ impl<'a> RealFft<'a> {
             let tmp = Complex32::new(-tmp1.im, tmp1.re);
 
             cbuffer[idx_a] = even + tmp;
+
             cbuffer[idx_b] = (even - tmp).conj();
+            
         }
+
 
         // 2. Inverse FFT of the complex sequence of N/2 points
         radix_2_dit_fft_core::<true>(cbuffer, self.twiddles, self.bitrev, 2);
