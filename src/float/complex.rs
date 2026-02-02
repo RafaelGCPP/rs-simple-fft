@@ -49,20 +49,16 @@ impl<'a> CplxFft<'a> {
             return Err(FftError::SizeMismatch);
         }
 
-        // Despacha para a versão monomorfizada correta
         if inverse {
             radix_2_dit_fft_core::<true>(buffer, self.twiddles, self.bitrev, 1);
         } else {
             radix_2_dit_fft_core::<false>(buffer, self.twiddles, self.bitrev, 1);
         }
 
-        // A normalização agora é feita passo a passo dentro do core (fixed-point style),
-        // portanto não precisamos mais escalar no final.
-
         Ok(())
     }
 }
 
 #[cfg(test)]
-#[path = "complex_tests.rs"] // Aponta para o arquivo separado
+#[path = "complex_tests.rs"] 
 mod tests;
