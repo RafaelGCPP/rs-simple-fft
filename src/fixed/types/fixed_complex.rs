@@ -16,7 +16,7 @@ impl<const FRAC: u32> ComplexFixed<FRAC> {
     pub fn conj(self) -> Self {
         ComplexFixed {
             re: self.re,
-            im: Fixed::from_bits(-self.im.to_bits()),
+            im: Fixed::from_bits(self.im.to_bits().saturating_neg()),
         }
     }
 
