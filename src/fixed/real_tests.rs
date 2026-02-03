@@ -1,6 +1,7 @@
 use super::super::core::TWIDDLE_FRAC;
 use super::super::types::{ComplexFixed, Fixed};
 use super::*;
+use crate::common::{FftNum, pack_rfft_spectrum, unpack_rfft_spectrum};
 
 fn to_f64<const FRAC: u32>(val: Fixed<FRAC>) -> f64 {
     val.to_bits() as f64 / (1u64 << FRAC) as f64
@@ -111,5 +112,70 @@ fn test_rfft_inverse_impulse() {
     // Check (Input should be recovered)
     for i in 0..n {
         assert_fixed_close(input[i], to_f64(original[i]), 0.1);
+    }
+}
+
+#[test]
+fn test_unpack_pack_spectrum_fixed() {
+    const FRAC: u32 = 15;
+
+    // Simulate a packed buffer from RFFT of size 8
+    // Layout:
+    // [0]: DC
+    // [1]: Nyquist
+    // [2,3]: F1.re, F1.im
+    // [4,5]: F2.re, F2.im
+    // [6,7]: F3.re, F3.im
+    let mut packed = [Fixed::<FRAC>::zero(); 8];
+    packed[0] = Fixed::<FRAC>::from_f64(10.0); // DC
+    packed[1] = Fixed::<FRAC>::from_f64(2.0); // Nyquist
+
+    // F1 = 3 + 4i
+    packed[2] = Fixed::<FRAC>::from_f64(3.0);
+    packed[3] = Fixed::<FRAC>::from_f64(4.0);
+
+    // F2 = 5 + 6i
+    packed[4] = Fixed::<FRAC>::from_f64(5.0);
+    packed[5] = Fixed::<FRAC>::from_f64(6.0);
+
+    // F3 = 7 + 8i
+    packed[6] = Fixed::<FRAC>::from_f64(7.0);
+    packed[7] = Fixed::<FRAC>::from_f64(8.0);
+
+    let mut spectrum = [ComplexFixed::<FRAC>::new(Fixed::zero(), Fixed::zero()); 8];
+    unpack_rfft_spectrum(&packed, &mut spectrum);
+
+    // Check DC (Index 0)
+    assert_fixed_close(spectrum[0].re, 10.0, 0.001);
+    assert_fixed_close(spectrum[0].im, 0.0, 0.001);
+
+    // Check Nyquist (Index 4)
+    assert_fixed_close(spectrum[4].re, 2.0, 0.001);
+    assert_fixed_close(spectrum[4].im, 0.0, 0.001);
+
+    // Check F1 (Index 1) and its Conjugate (Index 7)
+    assert_fixed_close(spectrum[1].re, 3.0, 0.001);
+    assert_fixed_close(spectrum[1].im, 4.0, 0.001);
+    assert_fixed_close(spectrum[7].re, 3.0, 0.001); // Real part same
+    assert_fixed_close(spectrum[7].im, -4.0, 0.001); // Imag part negated
+
+    // Check F2 (Index 2) and Conjugate (Index 6)
+    assert_fixed_close(spectrum[2].re, 5.0, 0.001);
+    assert_fixed_close(spectrum[2].im, 6.0, 0.001);
+    assert_fixed_close(spectrum[6].re, 5.0, 0.001);
+    assert_fixed_close(spectrum[6].im, -6.0, 0.001);
+
+    // Check F3 (Index 3) and Conjugate (Index 5)
+    assert_fixed_close(spectrum[3].re, 7.0, 0.001);
+    assert_fixed_close(spectrum[3].im, 8.0, 0.001);
+    assert_fixed_close(spectrum[5].re, 7.0, 0.001);
+    assert_fixed_close(spectrum[5].im, -8.0, 0.001);
+
+    // Test Round Trip (Pack back)
+    let mut packed_back = [Fixed::<FRAC>::zero(); 8];
+    pack_rfft_spectrum(&spectrum, &mut packed_back);
+
+    for i in 0..8 {
+        assert_fixed_close(packed_back[i], to_f64(packed[i]), 0.001);
     }
 }

@@ -1,8 +1,7 @@
-use super::core::{precompute_bitrev, precompute_twiddles, radix_2_dit_fft_core, TWIDDLE_FRAC};
-use super::types::{Fixed, ComplexFixed};
+use super::core::{TWIDDLE_FRAC, precompute_bitrev, precompute_twiddles, radix_2_dit_fft_core};
+use super::types::{ComplexFixed, Fixed};
 use crate::common::{FftError, FftProcess, RealFft};
 use core::slice;
-
 
 impl<'a> RealFft<'a, ComplexFixed<TWIDDLE_FRAC>> {
     /// Initializes the Real FFT.
@@ -15,7 +14,7 @@ impl<'a> RealFft<'a, ComplexFixed<TWIDDLE_FRAC>> {
         if !n.is_power_of_two() {
             return Err(FftError::NotPowerOfTwo);
         }
-        
+
         // For an N-point RFFT, we need auxiliary tables
         // compatible with the underlying N/2-point Complex FFT,
         // BUT the post-processing needs finer twiddles (size N).
@@ -53,9 +52,8 @@ impl<'a> RealFft<'a, ComplexFixed<TWIDDLE_FRAC>> {
         }
 
         // C TRICK: Reinterpret fixed array as ComplexFixed array
-        // Safety: ComplexFixed is repr(C) of two Fixeds, and alignment is compatible.
-        let cbuffer =
-            unsafe { slice::from_raw_parts_mut(buffer.as_mut_ptr() as *mut ComplexFixed<FRAC>, self.n / 2) };
+        // Uses the helper method which is safe wrapper around reinterpret_cast
+        let cbuffer = ComplexFixed::pack_mut(buffer);
 
         // FFT of the complex sequence of N/2 points, interleaved from real input
         radix_2_dit_fft_core::<FRAC, false>(cbuffer, self.twiddles, self.bitrev, 2);
@@ -69,8 +67,8 @@ impl<'a> RealFft<'a, ComplexFixed<TWIDDLE_FRAC>> {
             let val = cbuffer[0];
             // DC component = even.real + odd.imag = c[0].re + c[0].im
             // Nyquist component = even.real - odd.imag = c[0].re - c[0].im
-            
-            // In Fixed point, adding two N-bit numbers can overflow. 
+
+            // In Fixed point, adding two N-bit numbers can overflow.
             // Often FFT output formats assume growth.
             // However, this implementation keeps same storage type.
             // The caller must ensure headroom or accept wrap/saturation.
@@ -82,7 +80,7 @@ impl<'a> RealFft<'a, ComplexFixed<TWIDDLE_FRAC>> {
         }
 
         cbuffer[n_quarter] = cbuffer[n_quarter].conj();
-        
+
         // Main unweaving loop
         for i in 1..n_quarter {
             let idx_a = i;
@@ -105,10 +103,8 @@ impl<'a> RealFft<'a, ComplexFixed<TWIDDLE_FRAC>> {
             let tmp1 = odd * w;
 
             // tmp = I * tmp1 (re: -tmp1.im, im: tmp1.re)
-            let tmp = ComplexFixed::new(
-                Fixed::from_bits(tmp1.im.to_bits().wrapping_neg()), 
-                tmp1.re
-            );
+            let tmp =
+                ComplexFixed::new(Fixed::from_bits(tmp1.im.to_bits().wrapping_neg()), tmp1.re);
 
             // cdata[i] = even - I * odd * w  => even - tmp
             cbuffer[idx_a] = even - tmp;
@@ -128,8 +124,9 @@ impl<'a> RealFft<'a, ComplexFixed<TWIDDLE_FRAC>> {
             return Err(FftError::SizeMismatch);
         }
 
-        let cbuffer =
-            unsafe { slice::from_raw_parts_mut(buffer.as_mut_ptr() as *mut ComplexFixed<FRAC>, self.n / 2) };
+        let cbuffer = unsafe {
+            slice::from_raw_parts_mut(buffer.as_mut_ptr() as *mut ComplexFixed<FRAC>, self.n / 2)
+        };
 
         let n_half = self.n / 2;
         let n_quarter = n_half / 2;
@@ -142,7 +139,7 @@ impl<'a> RealFft<'a, ComplexFixed<TWIDDLE_FRAC>> {
         );
         cbuffer[n_quarter] = cbuffer[n_quarter].conj();
 
-        for i in 1..n_quarter  {
+        for i in 1..n_quarter {
             let idx_a = i;
             let idx_b = n_half - i;
 
@@ -157,20 +154,18 @@ impl<'a> RealFft<'a, ComplexFixed<TWIDDLE_FRAC>> {
 
             // w = conj(twd[i])
             let w = self.twiddles[i].conj();
-            
+
             // NOTE CAREFULLY:
             // "w" here is Q31. "odd" is Q<FRAC>.
             // "odd * w" results in Q<FRAC>.
             // The multiplication logic inside ComplexFixed handles the mixed Q-format correctly
             // assuming the implementation of Mul<ComplexFixed<TWIDDLE_FRAC>> exists.
-            
+
             let tmp1 = odd * w;
-            
+
             // tmp = I * odd * w
-            let tmp = ComplexFixed::new(
-                Fixed::from_bits(tmp1.im.to_bits().wrapping_neg()), 
-                tmp1.re
-            );
+            let tmp =
+                ComplexFixed::new(Fixed::from_bits(tmp1.im.to_bits().wrapping_neg()), tmp1.re);
 
             cbuffer[idx_a] = even + tmp;
 
@@ -184,7 +179,11 @@ impl<'a> RealFft<'a, ComplexFixed<TWIDDLE_FRAC>> {
         Ok(())
     }
 
-    pub fn process<const FRAC: u32>(&self, buffer: &mut [Fixed<FRAC>], inverse: bool) -> Result<(), FftError> {
+    pub fn process<const FRAC: u32>(
+        &self,
+        buffer: &mut [Fixed<FRAC>],
+        inverse: bool,
+    ) -> Result<(), FftError> {
         if inverse {
             self.irfft(buffer)
         } else {
@@ -194,7 +193,7 @@ impl<'a> RealFft<'a, ComplexFixed<TWIDDLE_FRAC>> {
 }
 
 // Implement trait for generic FRAC
-impl<'a, const FRAC: u32> FftProcess<Fixed<FRAC>> for RealFft<'a,ComplexFixed<TWIDDLE_FRAC>> {
+impl<'a, const FRAC: u32> FftProcess<Fixed<FRAC>> for RealFft<'a, ComplexFixed<TWIDDLE_FRAC>> {
     fn process(&self, buffer: &mut [Fixed<FRAC>], inverse: bool) -> Result<(), FftError> {
         self.process(buffer, inverse)
     }

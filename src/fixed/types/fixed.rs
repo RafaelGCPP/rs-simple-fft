@@ -19,7 +19,6 @@ impl<const FRAC: u32> Fixed<FRAC> {
         Self(value << FRAC)
     }
 
-
     /// Converts an f64 to Fixed, applying correct rounding.
     /// Useful for initializing constants and Twiddle Factors.
     pub fn from_f64(value: f64) -> Self {
@@ -88,9 +87,9 @@ impl<const F1: u32, const F2: u32> Mul<Fixed<F2>> for Fixed<F1> {
     fn mul(self, rhs: Fixed<F2>) -> Self::Output {
         let a = self.0 as i64;
         let b = rhs.0 as i64;
-        
+
         let product = a * b;
-        
+
         // If F2 > 0, add 2^(F2-1) for rounding
         let rounded = if F2 > 0 {
             let offset = 1i64 << (F2 - 1);
@@ -98,7 +97,7 @@ impl<const F1: u32, const F2: u32> Mul<Fixed<F2>> for Fixed<F1> {
         } else {
             product // If FRAC is 0, nothing to round
         };
-        
+
         Fixed::from_bits(rounded as i32)
     }
 }
@@ -151,13 +150,49 @@ impl<const F1: u32, const F2: u32> Sub<Fixed<F2>> for Fixed<F1> {
     }
 }
 
-
 use std::ops::SubAssign;
 impl<const F1: u32, const F2: u32> SubAssign<Fixed<F2>> for Fixed<F1> {
     #[inline]
     fn sub_assign(&mut self, rhs: Fixed<F2>) {
         let rhs_converted = rhs.convert::<F1>();
         self.0 -= rhs_converted.to_bits();
+    }
+}
+
+use super::fixed_complex::ComplexFixed;
+use crate::common::FftNum;
+
+impl<const FRAC: u32> FftNum for Fixed<FRAC> {
+    type Complex = ComplexFixed<FRAC>;
+
+    #[inline]
+    fn from_f64(v: f64) -> Self {
+        Self::from_f64(v)
+    }
+
+    #[inline]
+    fn zero() -> Self {
+        Self::from_int(0)
+    }
+
+    #[inline]
+    fn val_to_complex(re: Self, im: Self) -> Self::Complex {
+        ComplexFixed::new(re, im)
+    }
+
+    #[inline]
+    fn complex_re(c: &Self::Complex) -> Self {
+        c.re
+    }
+
+    #[inline]
+    fn complex_im(c: &Self::Complex) -> Self {
+        c.im
+    }
+
+    #[inline]
+    fn negate(self) -> Self {
+        Self::from_bits(self.to_bits().wrapping_neg())
     }
 }
 
@@ -175,15 +210,15 @@ mod tests {
     #[test]
     fn test_sum_different_scales() {
         let a = Fixed::<16>::from_int(1); // 1.0 in Q16
-        let b = Fixed::<8>::from_int(2);  // 2.0 in Q8
-        let res = a + b;                  // Result should be 3.0 in Q16
+        let b = Fixed::<8>::from_int(2); // 2.0 in Q8
+        let res = a + b; // Result should be 3.0 in Q16
         assert_eq!(res.to_bits(), 3 << 16);
     }
 
     #[test]
     fn test_multiplication_with_rounding() {
         // 0.5 (Q31) * 0.5 (Q31) = 0.25
-        let a = Fixed::<31>::from_bits(1 << 30); 
+        let a = Fixed::<31>::from_bits(1 << 30);
         let b = Fixed::<31>::from_bits(1 << 30);
         let res = a * b;
         assert_eq!(res.to_bits(), 1 << 29); // 0.25 in Q31

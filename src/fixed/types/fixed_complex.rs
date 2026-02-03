@@ -1,6 +1,7 @@
 use super::fixed::Fixed;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(C)]
 pub struct ComplexFixed<const FRAC: u32> {
     pub re: Fixed<FRAC>,
     pub im: Fixed<FRAC>,
@@ -9,6 +10,50 @@ pub struct ComplexFixed<const FRAC: u32> {
 impl<const FRAC: u32> ComplexFixed<FRAC> {
     pub fn new(re: Fixed<FRAC>, im: Fixed<FRAC>) -> Self {
         Self { re, im }
+    }
+
+    /// Views a Real slice as a Complex slice (zero-copy packing).
+    /// Safe wrapper for reinterpret_cast.
+    pub fn pack(reals: &[Fixed<FRAC>]) -> &[Self] {
+        assert_eq!(reals.len() % 2, 0, "Real slice length must be even");
+        unsafe {
+            core::slice::from_raw_parts(
+                reals.as_ptr() as *const ComplexFixed<FRAC>,
+                reals.len() / 2,
+            )
+        }
+    }
+
+    /// Views a Real mutable slice as a Complex mutable slice (zero-copy packing).
+    /// Safe wrapper for reinterpret_cast.
+    pub fn pack_mut(reals: &mut [Fixed<FRAC>]) -> &mut [Self] {
+        assert_eq!(reals.len() % 2, 0, "Real slice length must be even");
+        unsafe {
+            core::slice::from_raw_parts_mut(
+                reals.as_mut_ptr() as *mut ComplexFixed<FRAC>,
+                reals.len() / 2,
+            )
+        }
+    }
+
+    /// Views a Complex slice as a Real slice (zero-copy unpacking).
+    pub fn unpack(complexes: &[Self]) -> &[Fixed<FRAC>] {
+        unsafe {
+            core::slice::from_raw_parts(
+                complexes.as_ptr() as *const Fixed<FRAC>,
+                complexes.len() * 2,
+            )
+        }
+    }
+
+    /// Views a Complex mutable slice as a Real mutable slice (zero-copy unpacking).
+    pub fn unpack_mut(complexes: &mut [Self]) -> &mut [Fixed<FRAC>] {
+        unsafe {
+            core::slice::from_raw_parts_mut(
+                complexes.as_mut_ptr() as *mut Fixed<FRAC>,
+                complexes.len() * 2,
+            )
+        }
     }
 
     /// Returns the complex conjugate (a - bi)
@@ -85,7 +130,7 @@ impl<const F1: u32, const F2: u32> Mul<ComplexFixed<F2>> for ComplexFixed<F1> {
         let re = (self.re * rhs.re) - (self.im * rhs.im);
         // (ad + bc)
         let im = (self.re * rhs.im) + (self.im * rhs.re);
-        
+
         ComplexFixed { re, im }
     }
 }
@@ -99,7 +144,7 @@ mod tests {
         let re = Fixed::<16>::from_int(3);
         let im = Fixed::<16>::from_int(4);
         let c = ComplexFixed::new(re, im);
-        
+
         assert_eq!(c.re, re);
         assert_eq!(c.im, im);
     }
@@ -107,17 +152,11 @@ mod tests {
     #[test]
     fn test_addition_same_precision() {
         // (1 + 2i) + (3 + 4i) = (4 + 6i)
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(1),
-            Fixed::<16>::from_int(2)
-        );
-        let b = ComplexFixed::new(
-            Fixed::<16>::from_int(3),
-            Fixed::<16>::from_int(4)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_int(1), Fixed::<16>::from_int(2));
+        let b = ComplexFixed::new(Fixed::<16>::from_int(3), Fixed::<16>::from_int(4));
+
         let result = a + b;
-        
+
         assert_eq!(result.re, Fixed::<16>::from_int(4));
         assert_eq!(result.im, Fixed::<16>::from_int(6));
     }
@@ -125,17 +164,14 @@ mod tests {
     #[test]
     fn test_addition_mixed_precision() {
         // (1 + 2i) [Q16] + (0.5 + 0.5i) [Q31] = (1.5 + 2.5i) [Q16]
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(1),
-            Fixed::<16>::from_int(2)
-        );
+        let a = ComplexFixed::new(Fixed::<16>::from_int(1), Fixed::<16>::from_int(2));
         let b = ComplexFixed::new(
             Fixed::<31>::from_bits(1 << 30), // 0.5 in Q31
-            Fixed::<31>::from_bits(1 << 30)
+            Fixed::<31>::from_bits(1 << 30),
         );
-        
+
         let result = a + b;
-        
+
         assert_eq!(result.re, Fixed::<16>::from_f64(1.5));
         assert_eq!(result.im, Fixed::<16>::from_f64(2.5));
     }
@@ -143,17 +179,11 @@ mod tests {
     #[test]
     fn test_addition_with_negative() {
         // (5 + 3i) + (-2 - 1i) = (3 + 2i)
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(5),
-            Fixed::<16>::from_int(3)
-        );
-        let b = ComplexFixed::new(
-            Fixed::<16>::from_int(-2),
-            Fixed::<16>::from_int(-1)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_int(5), Fixed::<16>::from_int(3));
+        let b = ComplexFixed::new(Fixed::<16>::from_int(-2), Fixed::<16>::from_int(-1));
+
         let result = a + b;
-        
+
         assert_eq!(result.re, Fixed::<16>::from_int(3));
         assert_eq!(result.im, Fixed::<16>::from_int(2));
     }
@@ -161,17 +191,11 @@ mod tests {
     #[test]
     fn test_add_assign() {
         // Test += operator
-        let mut a = ComplexFixed::new(
-            Fixed::<16>::from_int(1),
-            Fixed::<16>::from_int(2)
-        );
-        let b = ComplexFixed::new(
-            Fixed::<16>::from_int(3),
-            Fixed::<16>::from_int(4)
-        );
-        
+        let mut a = ComplexFixed::new(Fixed::<16>::from_int(1), Fixed::<16>::from_int(2));
+        let b = ComplexFixed::new(Fixed::<16>::from_int(3), Fixed::<16>::from_int(4));
+
         a += b;
-        
+
         assert_eq!(a.re, Fixed::<16>::from_int(4));
         assert_eq!(a.im, Fixed::<16>::from_int(6));
     }
@@ -179,17 +203,11 @@ mod tests {
     #[test]
     fn test_multiplication_same_precision() {
         // (1 + 2i) * (3 + 4i) = (1*3 - 2*4) + (1*4 + 2*3)i = -5 + 10i
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(1),
-            Fixed::<16>::from_int(2)
-        );
-        let b = ComplexFixed::new(
-            Fixed::<16>::from_int(3),
-            Fixed::<16>::from_int(4)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_int(1), Fixed::<16>::from_int(2));
+        let b = ComplexFixed::new(Fixed::<16>::from_int(3), Fixed::<16>::from_int(4));
+
         let result = a * b;
-        
+
         assert_eq!(result.re, Fixed::<16>::from_int(-5));
         assert_eq!(result.im, Fixed::<16>::from_int(10));
     }
@@ -197,17 +215,14 @@ mod tests {
     #[test]
     fn test_multiplication_mixed_precision() {
         // (2 + 0i) * (0.5 + 0i) = (1 + 0i)
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(2),
-            Fixed::<16>::from_int(0)
-        );
+        let a = ComplexFixed::new(Fixed::<16>::from_int(2), Fixed::<16>::from_int(0));
         let b = ComplexFixed::new(
             Fixed::<31>::from_bits(1 << 30), // 0.5 in Q31
-            Fixed::<31>::from_int(0)
+            Fixed::<31>::from_int(0),
         );
-        
+
         let result = a * b;
-        
+
         assert_eq!(result.re, Fixed::<16>::from_int(1));
         assert_eq!(result.im, Fixed::<16>::from_int(0));
     }
@@ -215,17 +230,11 @@ mod tests {
     #[test]
     fn test_multiplication_by_i() {
         // (3 + 4i) * (0 + 1i) = (0 - 4) + (3 + 0)i = -4 + 3i
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(3),
-            Fixed::<16>::from_int(4)
-        );
-        let i = ComplexFixed::new(
-            Fixed::<16>::from_int(0),
-            Fixed::<16>::from_int(1)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_int(3), Fixed::<16>::from_int(4));
+        let i = ComplexFixed::new(Fixed::<16>::from_int(0), Fixed::<16>::from_int(1));
+
         let result = a * i;
-        
+
         assert_eq!(result.re, Fixed::<16>::from_int(-4));
         assert_eq!(result.im, Fixed::<16>::from_int(3));
     }
@@ -233,17 +242,11 @@ mod tests {
     #[test]
     fn test_multiplication_by_conjugate() {
         // (3 + 4i) * (3 - 4i) = (9 + 16) + 0i = 25 + 0i
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(3),
-            Fixed::<16>::from_int(4)
-        );
-        let conj = ComplexFixed::new(
-            Fixed::<16>::from_int(3),
-            Fixed::<16>::from_int(-4)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_int(3), Fixed::<16>::from_int(4));
+        let conj = ComplexFixed::new(Fixed::<16>::from_int(3), Fixed::<16>::from_int(-4));
+
         let result = a * conj;
-        
+
         assert_eq!(result.re, Fixed::<16>::from_int(25));
         assert_eq!(result.im, Fixed::<16>::from_int(0));
     }
@@ -251,13 +254,10 @@ mod tests {
     #[test]
     fn test_fractional_values() {
         // (0.5 + 0.5i) * (0.5 + 0.5i) = (0 + 0.5i)
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_f64(0.5),
-            Fixed::<16>::from_f64(0.5)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_f64(0.5), Fixed::<16>::from_f64(0.5));
+
         let result = a * a;
-        
+
         // re = 0.5*0.5 - 0.5*0.5 = 0.25 - 0.25 = 0
         // im = 0.5*0.5 + 0.5*0.5 = 0.25 + 0.25 = 0.5
         assert_eq!(result.re, Fixed::<16>::from_int(0));
@@ -269,17 +269,11 @@ mod tests {
     #[test]
     fn test_subtraction_same_precision() {
         // (5 + 7i) - (2 + 3i) = (3 + 4i)
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(5),
-            Fixed::<16>::from_int(7)
-        );
-        let b = ComplexFixed::new(
-            Fixed::<16>::from_int(2),
-            Fixed::<16>::from_int(3)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_int(5), Fixed::<16>::from_int(7));
+        let b = ComplexFixed::new(Fixed::<16>::from_int(2), Fixed::<16>::from_int(3));
+
         let result = a - b;
-        
+
         assert_eq!(result.re, Fixed::<16>::from_int(3));
         assert_eq!(result.im, Fixed::<16>::from_int(4));
     }
@@ -287,17 +281,14 @@ mod tests {
     #[test]
     fn test_subtraction_mixed_precision() {
         // (2 + 3i) [Q16] - (0.5 + 0.5i) [Q31] = (1.5 + 2.5i) [Q16]
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(2),
-            Fixed::<16>::from_int(3)
-        );
+        let a = ComplexFixed::new(Fixed::<16>::from_int(2), Fixed::<16>::from_int(3));
         let b = ComplexFixed::new(
             Fixed::<31>::from_bits(1 << 30), // 0.5 in Q31
-            Fixed::<31>::from_bits(1 << 30)
+            Fixed::<31>::from_bits(1 << 30),
         );
-        
+
         let result = a - b;
-        
+
         assert_eq!(result.re, Fixed::<16>::from_f64(1.5));
         assert_eq!(result.im, Fixed::<16>::from_f64(2.5));
     }
@@ -305,17 +296,11 @@ mod tests {
     #[test]
     fn test_subtraction_resulting_negative() {
         // (1 + 2i) - (3 + 5i) = (-2 - 3i)
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(1),
-            Fixed::<16>::from_int(2)
-        );
-        let b = ComplexFixed::new(
-            Fixed::<16>::from_int(3),
-            Fixed::<16>::from_int(5)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_int(1), Fixed::<16>::from_int(2));
+        let b = ComplexFixed::new(Fixed::<16>::from_int(3), Fixed::<16>::from_int(5));
+
         let result = a - b;
-        
+
         assert_eq!(result.re, Fixed::<16>::from_int(-2));
         assert_eq!(result.im, Fixed::<16>::from_int(-3));
     }
@@ -323,17 +308,11 @@ mod tests {
     #[test]
     fn test_sub_assign() {
         // Test -= operator
-        let mut a = ComplexFixed::new(
-            Fixed::<16>::from_int(5),
-            Fixed::<16>::from_int(7)
-        );
-        let b = ComplexFixed::new(
-            Fixed::<16>::from_int(2),
-            Fixed::<16>::from_int(3)
-        );
-        
+        let mut a = ComplexFixed::new(Fixed::<16>::from_int(5), Fixed::<16>::from_int(7));
+        let b = ComplexFixed::new(Fixed::<16>::from_int(2), Fixed::<16>::from_int(3));
+
         a -= b;
-        
+
         assert_eq!(a.re, Fixed::<16>::from_int(3));
         assert_eq!(a.im, Fixed::<16>::from_int(4));
     }
@@ -343,13 +322,10 @@ mod tests {
     #[test]
     fn test_conj_positive() {
         // conj(3 + 4i) = (3 - 4i)
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(3),
-            Fixed::<16>::from_int(4)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_int(3), Fixed::<16>::from_int(4));
+
         let result = a.conj();
-        
+
         assert_eq!(result.re, Fixed::<16>::from_int(3));
         assert_eq!(result.im, Fixed::<16>::from_int(-4));
     }
@@ -357,13 +333,10 @@ mod tests {
     #[test]
     fn test_conj_negative_imaginary() {
         // conj(2 - 5i) = (2 + 5i)
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(2),
-            Fixed::<16>::from_int(-5)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_int(2), Fixed::<16>::from_int(-5));
+
         let result = a.conj();
-        
+
         assert_eq!(result.re, Fixed::<16>::from_int(2));
         assert_eq!(result.im, Fixed::<16>::from_int(5));
     }
@@ -371,13 +344,10 @@ mod tests {
     #[test]
     fn test_conj_zero_imaginary() {
         // conj(7 + 0i) = (7 + 0i)
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(7),
-            Fixed::<16>::from_int(0)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_int(7), Fixed::<16>::from_int(0));
+
         let result = a.conj();
-        
+
         assert_eq!(result.re, Fixed::<16>::from_int(7));
         assert_eq!(result.im, Fixed::<16>::from_int(0));
     }
@@ -385,13 +355,10 @@ mod tests {
     #[test]
     fn test_conj_fractional() {
         // conj(0.5 + 0.25i) = (0.5 - 0.25i)
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_f64(0.5),
-            Fixed::<16>::from_f64(0.25)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_f64(0.5), Fixed::<16>::from_f64(0.25));
+
         let result = a.conj();
-        
+
         assert_eq!(result.re, Fixed::<16>::from_f64(0.5));
         assert_eq!(result.im, Fixed::<16>::from_f64(-0.25));
     }
@@ -401,13 +368,10 @@ mod tests {
     #[test]
     fn test_scale_half_integer() {
         // scale_half(4 + 6i) = (2 + 3i)
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(4),
-            Fixed::<16>::from_int(6)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_int(4), Fixed::<16>::from_int(6));
+
         let result = a.scale_half();
-        
+
         assert_eq!(result.re, Fixed::<16>::from_int(2));
         assert_eq!(result.im, Fixed::<16>::from_int(3));
     }
@@ -415,13 +379,10 @@ mod tests {
     #[test]
     fn test_scale_half_fractional() {
         // scale_half(1 + 1i) = (0.5 + 0.5i)
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(1),
-            Fixed::<16>::from_int(1)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_int(1), Fixed::<16>::from_int(1));
+
         let result = a.scale_half();
-        
+
         assert_eq!(result.re, Fixed::<16>::from_f64(0.5));
         assert_eq!(result.im, Fixed::<16>::from_f64(0.5));
     }
@@ -429,13 +390,10 @@ mod tests {
     #[test]
     fn test_scale_half_negative() {
         // scale_half(-4 - 8i) = (-2 - 4i)
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(-4),
-            Fixed::<16>::from_int(-8)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_int(-4), Fixed::<16>::from_int(-8));
+
         let result = a.scale_half();
-        
+
         assert_eq!(result.re, Fixed::<16>::from_int(-2));
         assert_eq!(result.im, Fixed::<16>::from_int(-4));
     }
@@ -443,13 +401,10 @@ mod tests {
     #[test]
     fn test_scale_half_twice() {
         // scale_half(scale_half(8 + 4i)) = (2 + 1i)
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(8),
-            Fixed::<16>::from_int(4)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_int(8), Fixed::<16>::from_int(4));
+
         let result = a.scale_half().scale_half();
-        
+
         assert_eq!(result.re, Fixed::<16>::from_int(2));
         assert_eq!(result.im, Fixed::<16>::from_int(1));
     }
@@ -457,13 +412,10 @@ mod tests {
     #[test]
     fn test_scale_half_zero() {
         // scale_half(0 + 0i) = (0 + 0i)
-        let a = ComplexFixed::new(
-            Fixed::<16>::from_int(0),
-            Fixed::<16>::from_int(0)
-        );
-        
+        let a = ComplexFixed::new(Fixed::<16>::from_int(0), Fixed::<16>::from_int(0));
+
         let result = a.scale_half();
-        
+
         assert_eq!(result.re, Fixed::<16>::from_int(0));
         assert_eq!(result.im, Fixed::<16>::from_int(0));
     }
