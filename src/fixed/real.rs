@@ -1,15 +1,10 @@
 use super::core::{precompute_bitrev, precompute_twiddles, radix_2_dit_fft_core, TWIDDLE_FRAC};
 use super::types::{Fixed, ComplexFixed};
-use crate::common::{FftError, FftProcess};
+use crate::common::{FftError, FftProcess, RealFft};
 use core::slice;
 
-pub struct RealFft<'a> {
-    twiddles: &'a mut [ComplexFixed<TWIDDLE_FRAC>],
-    bitrev: &'a mut [usize],
-    n: usize,
-}
 
-impl<'a> RealFft<'a> {
+impl<'a> RealFft<'a, ComplexFixed<TWIDDLE_FRAC>> {
     /// Initializes the Real FFT.
     /// Note that 'n' here is the number of REAL samples.
     pub fn new(
@@ -199,7 +194,7 @@ impl<'a> RealFft<'a> {
 }
 
 // Implement trait for generic FRAC
-impl<'a, const FRAC: u32> FftProcess<Fixed<FRAC>> for RealFft<'a> {
+impl<'a, const FRAC: u32> FftProcess<Fixed<FRAC>> for RealFft<'a,ComplexFixed<TWIDDLE_FRAC>> {
     fn process(&self, buffer: &mut [Fixed<FRAC>], inverse: bool) -> Result<(), FftError> {
         self.process(buffer, inverse)
     }

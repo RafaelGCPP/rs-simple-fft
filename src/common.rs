@@ -27,3 +27,19 @@ pub trait FftProcess<T> {
 
 #[cfg(feature = "std")]
 impl std::error::Error for FftError {}
+
+/// Generic RealFFT struct.
+/// T represents the Complex Number type used for twiddle factors.
+pub struct RealFft<'a, T> {
+    pub twiddles: &'a mut [T],
+    pub bitrev: &'a mut [usize],
+    pub n: usize,
+}
+
+/// Generic CplxFft struct.
+/// T represents the Complex Number type used for twiddle factors.
+pub struct CplxFft<'a, T> {
+    pub twiddles: &'a mut [T],
+    pub bitrev: &'a mut [usize],
+    pub n: usize,
+}

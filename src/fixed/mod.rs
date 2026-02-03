@@ -1,9 +1,7 @@
-pub mod types;
-mod core;
 pub mod complex;
-pub mod real;
+mod core;
 pub mod math;
+pub mod real;
+pub mod types;
 
-pub use complex::CplxFft;
-pub use real::RealFft;
-pub use types::{Fixed, ComplexFixed};
+pub use types::{ComplexFixed, Fixed};

@@ -32,7 +32,7 @@ fn test_fft_forward() {
     let mut twiddles = vec![Complex32::new(0., 0.); n ];
     let mut bitrev = vec![0; n/2];
 
-    let fft = RealFft::new(&mut twiddles, &mut bitrev, n).unwrap();
+    let fft = RealFft::<Complex32>::new(&mut twiddles, &mut bitrev, n).unwrap();
 
     fft.process(&mut buffer, false).unwrap();
 
@@ -62,7 +62,7 @@ fn test_fft_reverse() {
     let mut twiddles = vec![Complex32::new(0., 0.); n ];
     let mut bitrev = vec![0; n/2];
 
-    let fft = RealFft::new(&mut twiddles, &mut bitrev, n).unwrap();
+    let fft = RealFft::<Complex32>::new(&mut twiddles, &mut bitrev, n).unwrap();
 
     fft.process(&mut buffer, true).unwrap();
 

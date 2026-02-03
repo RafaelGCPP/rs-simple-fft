@@ -1,6 +1,6 @@
-use crate::common::{FftError, FftProcess}; // Adicione FftProcess aqui
+use super::core::{precompute_bitrev, precompute_twiddles, radix_2_dit_fft_core};
+use crate::common::{CplxFft, FftError, FftProcess}; // Adicione FftProcess aqui
 use num_complex::Complex32; // Complex<f32>
-use super::core::{radix_2_dit_fft_core, precompute_twiddles, precompute_bitrev};
 
 // In no_std, we need to import math functions from somewhere.
 // If the "std" feature is enabled, we use native f32::sin/cos.
@@ -10,20 +10,12 @@ use super::core::{radix_2_dit_fft_core, precompute_twiddles, precompute_bitrev};
 #[cfg(not(feature = "std"))]
 use libm::Libm;
 
-/// Structure that holds the precomputed tables (Twiddle factors and Bit Reverse).
-/// This replaces passing 'twiddle' and 'bitrev' around in every function.
-pub struct CplxFft<'a> {
-    twiddles: &'a mut [Complex32],
-    bitrev: &'a mut [usize],
-    n: usize,
-}
-
-impl<'a> CplxFft<'a> {
+impl<'a> CplxFft<'a, Complex32> {
     /// Initializes the tables (Port from `fft_init.c`)
     pub fn new(
-        twiddles: &'a mut [Complex32], 
-        bitrev: &'a mut [usize], 
-        n: usize
+        twiddles: &'a mut [Complex32],
+        bitrev: &'a mut [usize],
+        n: usize,
     ) -> Result<Self, FftError> {
         if !n.is_power_of_two() {
             return Err(FftError::NotPowerOfTwo);
@@ -32,7 +24,11 @@ impl<'a> CplxFft<'a> {
             return Err(FftError::BufferTooSmall);
         }
 
-        let mut fft = Self { twiddles, bitrev, n };
+        let mut fft = Self {
+            twiddles,
+            bitrev,
+            n,
+        };
         fft.precompute();
         Ok(fft)
     }
@@ -60,12 +56,12 @@ impl<'a> CplxFft<'a> {
 }
 
 // Implementação da trait FftProcess para CplxFft
-impl<'a> FftProcess<Complex32> for CplxFft<'a> {
+impl<'a> FftProcess<Complex32> for CplxFft<'a, Complex32> {
     fn process(&self, buffer: &mut [Complex32], inverse: bool) -> Result<(), FftError> {
         self.process(buffer, inverse)
     }
 }
 
 #[cfg(test)]
-#[path = "complex_tests.rs"] 
+#[path = "complex_tests.rs"]
 mod tests;

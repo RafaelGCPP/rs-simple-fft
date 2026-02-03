@@ -1,23 +1,13 @@
-use crate::common::{FftError, FftProcess};
+use super::core::{TWIDDLE_FRAC, precompute_bitrev, precompute_twiddles, radix_2_dit_fft_core};
 use super::types::ComplexFixed;
-use super::core::{radix_2_dit_fft_core, precompute_twiddles, precompute_bitrev, TWIDDLE_FRAC};
+use crate::common::{CplxFft, FftError, FftProcess};
 
-/// Structure that holds the precomputed tables (Twiddle factors and Bit Reverse).
-/// 
-/// For the fixed-point implementation, the twiddle factors are always high-precision (Q31),
-/// allowing this single structure to process data buffers of ANY fractional precision (Q15, Q31, etc.).
-pub struct CplxFft<'a> {
-    twiddles: &'a mut [ComplexFixed<TWIDDLE_FRAC>],
-    bitrev: &'a mut [usize],
-    n: usize,
-}
-
-impl<'a> CplxFft<'a> {
+impl<'a> CplxFft<'a, ComplexFixed<TWIDDLE_FRAC>> {
     /// Initializes the tables.
     pub fn new(
-        twiddles: &'a mut [ComplexFixed<TWIDDLE_FRAC>], 
-        bitrev: &'a mut [usize], 
-        n: usize
+        twiddles: &'a mut [ComplexFixed<TWIDDLE_FRAC>],
+        bitrev: &'a mut [usize],
+        n: usize,
     ) -> Result<Self, FftError> {
         if !n.is_power_of_two() {
             return Err(FftError::NotPowerOfTwo);
@@ -29,7 +19,11 @@ impl<'a> CplxFft<'a> {
             return Err(FftError::BufferTooSmall);
         }
 
-        let mut fft = Self { twiddles, bitrev, n };
+        let mut fft = Self {
+            twiddles,
+            bitrev,
+            n,
+        };
         fft.precompute();
         Ok(fft)
     }
@@ -41,7 +35,11 @@ impl<'a> CplxFft<'a> {
     }
 
     /// Executes the FFT in-place for a specific fixed-point format.
-    pub fn process<const FRAC: u32>(&self, buffer: &mut [ComplexFixed<FRAC>], inverse: bool) -> Result<(), FftError> {
+    pub fn process<const FRAC: u32>(
+        &self,
+        buffer: &mut [ComplexFixed<FRAC>],
+        inverse: bool,
+    ) -> Result<(), FftError> {
         if buffer.len() != self.n {
             return Err(FftError::SizeMismatch);
         }
@@ -58,12 +56,14 @@ impl<'a> CplxFft<'a> {
 
 // Implement FftProcess for ANY fixed-point precision.
 // This allows the same CplxFft instance to be reused for buffers with different Q-formats.
-impl<'a, const FRAC: u32> FftProcess<ComplexFixed<FRAC>> for CplxFft<'a> {
+impl<'a, const FRAC: u32> FftProcess<ComplexFixed<FRAC>>
+    for CplxFft<'a, ComplexFixed<TWIDDLE_FRAC>>
+{
     fn process(&self, buffer: &mut [ComplexFixed<FRAC>], inverse: bool) -> Result<(), FftError> {
         self.process(buffer, inverse)
     }
 }
 
 #[cfg(test)]
-#[path = "complex_tests.rs"] 
+#[path = "complex_tests.rs"]
 mod tests;

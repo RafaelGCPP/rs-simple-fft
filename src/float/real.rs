@@ -1,5 +1,5 @@
 use super::core::{precompute_bitrev, precompute_twiddles, radix_2_dit_fft_core};
-use crate::common::{ FftError , FftProcess };
+use crate::common::{FftError, FftProcess, RealFft};
 use core::slice;
 use num_complex::Complex32;
 
@@ -8,13 +8,13 @@ use libm::Libm;
 #[cfg(feature = "std")]
 use std::f32;
 
-pub struct RealFft<'a> {
-    twiddles: &'a mut [Complex32],
-    bitrev: &'a mut [usize],
-    n: usize,
-}
+// pub struct RealFft<'a> {
+//     twiddles: &'a mut [Complex32],
+//     bitrev: &'a mut [usize],
+//     n: usize,
+// }
 
-impl<'a> RealFft<'a> {
+impl<'a> RealFft<'a, Complex32> {
     /// Initializes the Real FFT.
     /// Note that 'n' here is the number of REAL samples.
     pub fn new(
@@ -33,7 +33,7 @@ impl<'a> RealFft<'a> {
             return Err(FftError::BufferTooSmall);
         }
 
-        let mut fft = Self {
+        let mut fft: RealFft<'a, num_complex::Complex<f32>> = Self {
             twiddles,
             bitrev,
             n,
@@ -157,7 +157,7 @@ impl<'a> RealFft<'a> {
         );
         cbuffer[n_quarter] = cbuffer[n_quarter].conj();
 
-        for i in 1..n_quarter  {
+        for i in 1..n_quarter {
             let idx_a = i;
             let idx_b = n_half - i;
 
@@ -180,9 +180,7 @@ impl<'a> RealFft<'a> {
             cbuffer[idx_a] = even + tmp;
 
             cbuffer[idx_b] = (even - tmp).conj();
-            
         }
-
 
         // 2. Inverse FFT of the complex sequence of N/2 points
         radix_2_dit_fft_core::<true>(cbuffer, self.twiddles, self.bitrev, 2);
@@ -206,7 +204,7 @@ impl<'a> RealFft<'a> {
 }
 
 // Implementação da trait FftProcess para RealFft
-impl<'a> FftProcess<f32> for RealFft<'a> {
+impl<'a> FftProcess<f32> for RealFft<'a, Complex32> {
     fn process(&self, buffer: &mut [f32], inverse: bool) -> Result<(), FftError> {
         self.process(buffer, inverse)
     }

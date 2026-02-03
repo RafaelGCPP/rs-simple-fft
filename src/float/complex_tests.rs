@@ -6,7 +6,9 @@ fn assert_complex_close(val: Complex32, expected: Complex32) {
     let diff = (val - expected).l1_norm();
     assert!(
         diff < tolerance,
-        "Error. Expected: {}, Got: {}", expected, val
+        "Error. Expected: {}, Got: {}",
+        expected,
+        val
     );
 }
 
@@ -15,13 +17,13 @@ fn test_fft_forward() {
     let n = 8;
 
     let input = [
-        Complex32::new(1.0, 2.0), 
+        Complex32::new(1.0, 2.0),
         Complex32::new(3.0, 4.0),
-        Complex32::new(5.0, 6.0), 
+        Complex32::new(5.0, 6.0),
         Complex32::new(7.0, 8.0),
-        Complex32::new(-8.0, -7.0), 
+        Complex32::new(-8.0, -7.0),
         Complex32::new(-6.0, -5.0),
-        Complex32::new(-4.0, -3.0), 
+        Complex32::new(-4.0, -3.0),
         Complex32::new(-2.0, -1.0),
     ];
 
@@ -40,7 +42,7 @@ fn test_fft_forward() {
     let mut twiddles = vec![Complex32::new(0., 0.); n / 2];
     let mut bitrev = vec![0; n];
 
-    let fft = CplxFft::new(&mut twiddles, &mut bitrev, n).unwrap();
+    let fft = CplxFft::<'_, Complex32>::new(&mut twiddles, &mut bitrev, n).unwrap();
 
     fft.process(&mut buffer, false).unwrap();
 
@@ -54,13 +56,13 @@ fn test_fft_reverse() {
     let n = 8;
 
     let expected_input = [
-        Complex32::new(1.0, 2.0), 
+        Complex32::new(1.0, 2.0),
         Complex32::new(3.0, 4.0),
-        Complex32::new(5.0, 6.0), 
+        Complex32::new(5.0, 6.0),
         Complex32::new(7.0, 8.0),
-        Complex32::new(-8.0, -7.0), 
+        Complex32::new(-8.0, -7.0),
         Complex32::new(-6.0, -5.0),
-        Complex32::new(-4.0, -3.0), 
+        Complex32::new(-4.0, -3.0),
         Complex32::new(-2.0, -1.0),
     ];
 
@@ -78,7 +80,7 @@ fn test_fft_reverse() {
     let mut twiddles = vec![Complex32::new(0., 0.); n / 2];
     let mut bitrev = vec![0; n];
 
-    let fft = CplxFft::new(&mut twiddles, &mut bitrev, n).unwrap();
+    let fft = CplxFft::<'_, Complex32>::new(&mut twiddles, &mut bitrev, n).unwrap();
 
     fft.process(&mut buffer, true).unwrap();
 
