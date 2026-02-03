@@ -34,6 +34,12 @@ impl<const FRAC: u32> Fixed<FRAC> {
     pub fn to_bits(self) -> i32 {
         self.0
     }
+
+    /// Scales the value by 0.5 (shifts right by 1).
+    #[inline]
+    pub fn scale_half(self) -> Self {
+        Self(self.0 >> 1)
+    }
 }
 
 impl<const FRAC: u32> Fixed<FRAC> {
