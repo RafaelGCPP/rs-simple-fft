@@ -1,6 +1,6 @@
-use crate::common::FftError; 
+use super::core::{precompute_bitrev, precompute_twiddles, radix_2_dit_fft_core};
+use crate::common::{CplxFft, FftError, FftProcess}; // Adicione FftProcess aqui
 use num_complex::Complex32; // Complex<f32>
-use super::core::{radix_2_dit_fft_core, precompute_twiddles, precompute_bitrev};
 
 // In no_std, we need to import math functions from somewhere.
 // If the "std" feature is enabled, we use native f32::sin/cos.
@@ -10,20 +10,12 @@ use super::core::{radix_2_dit_fft_core, precompute_twiddles, precompute_bitrev};
 #[cfg(not(feature = "std"))]
 use libm::Libm;
 
-/// Structure that holds the precomputed tables (Twiddle factors and Bit Reverse).
-/// This replaces passing 'twiddle' and 'bitrev' around in every function.
-pub struct CplxFft<'a> {
-    twiddles: &'a mut [Complex32],
-    bitrev: &'a mut [usize],
-    n: usize,
-}
-
-impl<'a> CplxFft<'a> {
+impl<'a> CplxFft<'a, Complex32> {
     /// Initializes the tables (Port from `fft_init.c`)
     pub fn new(
-        twiddles: &'a mut [Complex32], 
-        bitrev: &'a mut [usize], 
-        n: usize
+        twiddles: &'a mut [Complex32],
+        bitrev: &'a mut [usize],
+        n: usize,
     ) -> Result<Self, FftError> {
         if !n.is_power_of_two() {
             return Err(FftError::NotPowerOfTwo);
@@ -32,7 +24,11 @@ impl<'a> CplxFft<'a> {
             return Err(FftError::BufferTooSmall);
         }
 
-        let mut fft = Self { twiddles, bitrev, n };
+        let mut fft = Self {
+            twiddles,
+            bitrev,
+            n,
+        };
         fft.precompute();
         Ok(fft)
     }
@@ -49,20 +45,23 @@ impl<'a> CplxFft<'a> {
             return Err(FftError::SizeMismatch);
         }
 
-        // Despacha para a versão monomorfizada correta
         if inverse {
             radix_2_dit_fft_core::<true>(buffer, self.twiddles, self.bitrev, 1);
         } else {
             radix_2_dit_fft_core::<false>(buffer, self.twiddles, self.bitrev, 1);
         }
 
-        // A normalização agora é feita passo a passo dentro do core (fixed-point style),
-        // portanto não precisamos mais escalar no final.
-
         Ok(())
     }
 }
 
+// Implementação da trait FftProcess para CplxFft
+impl<'a> FftProcess<Complex32> for CplxFft<'a, Complex32> {
+    fn process(&self, buffer: &mut [Complex32], inverse: bool) -> Result<(), FftError> {
+        self.process(buffer, inverse)
+    }
+}
+
 #[cfg(test)]
-#[path = "complex_tests.rs"] // Aponta para o arquivo separado
+#[path = "complex_tests.rs"]
 mod tests;

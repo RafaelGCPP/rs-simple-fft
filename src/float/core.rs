@@ -72,7 +72,7 @@ pub(crate) fn radix_2_dit_fft_core<const INVERSE: bool>(
         for j in (0..jmax).step_by(stride << 1) {
             for i in 0..stride {
                 let mut w = twiddles[i * tw_index * twiddle_stride];
-                
+
                 // The compiler will completely remove this IF because INVERSE is a compile-time constant
                 if INVERSE {
                     w = w.conj();

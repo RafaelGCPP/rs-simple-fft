@@ -1,7 +1,5 @@
 pub mod complex;
-pub mod real;
 mod core;
+pub mod real;
 
-pub use complex::CplxFft;
-pub use real::RealFft;
-
+pub use crate::common::{FftError, FftProcess};
